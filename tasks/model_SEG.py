@@ -133,8 +133,8 @@ def HeatmapLoss(y_true, y_pred):
 def NME(y_true, y_pred):
     return tf.reduce_mean(tf.keras.losses.MSE(y_true, y_pred))
 
-def FacialLandmarkDetector(num_modules=8):
-    num_parts = 1
+def FacialLandmarkDetector(num_modules=4):
+    num_parts = 68
     layers_dict = dict()
     
     inputs = Input(shape=(256, 256, 3), batch_size=None, sparse=False, ragged=False)
