@@ -6,6 +6,14 @@ import tensorflow as tf
 from tqdm import tqdm
 import sys
 
+def l2_distance(a, b):
+    d = a - b
+    error = 0.
+    for i, p in enumerate(d):
+        error += np.sqrt(p[0] ** 2 + p[1] ** 2)
+    error = error / d.shape[0]
+    return error
+
 def show_hms(hms, gts=None):
     parts = ['right ankle', 'right knee', 'right hip',
              'left hip', 'left knee', 'left ankle',
