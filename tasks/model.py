@@ -120,11 +120,11 @@ def NME(y_true, y_pred):
 
 def lr_scheduler(epoch, lr):
     if epoch == 20:
-        return 1e-03
-    if epoch == 35:
         return 1e-04
-    if epoch == 50:
+    if epoch == 35:
         return 1e-05
+    if epoch == 50:
+        return 1e-06
     return lr
 
 def FacialLandmarkDetector(num_modules=4):
