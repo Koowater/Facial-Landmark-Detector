@@ -14,6 +14,17 @@ def l2_distance(a, b):
     error = error / d.shape[0]
     return error
 
+def parse_heatmap(hms):
+    pred_kps = np.zeros((hms.shape[-1], 2))
+    size = hms.shape[0]
+    for i in range(hms.shape[-1]):
+        hm = hms[:,:,i]
+        idx = np.argmax(hm)
+        x = idx % size
+        y = idx // size
+        pred_kps[i] = np.array([x, y])
+    return pred_kps
+
 def show_hms(hms, gts=None):
     parts = ['right ankle', 'right knee', 'right hip',
              'left hip', 'left knee', 'left ankle',

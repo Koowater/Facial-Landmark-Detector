@@ -133,6 +133,15 @@ def HeatmapLoss(y_true, y_pred):
 def NME(y_true, y_pred):
     return tf.reduce_mean(tf.keras.losses.MSE(y_true, y_pred))
 
+def lr_scheduler(epoch, lr):
+    if epoch == 20:
+        return 1e-03
+    if epoch == 35:
+        return 1e-04
+    if epoch == 50:
+        return 1e-05
+    return lr
+
 def FacialLandmarkDetector(num_modules=4):
     num_parts = 68
     layers_dict = dict()
@@ -187,12 +196,12 @@ def FacialLandmarkDetector(num_modules=4):
             tmp_out_ = layers_dict['al' + str(i)](tmp_out)
             previous = previous + ll + tmp_out_
     
-    initial_learning_rate = 1e-03
-    decay_steps = 12.0
-    decay_rate = 0.2
-    learning_rate_fn = tf.keras.optimizers.schedules.InverseTimeDecay(initial_learning_rate, decay_steps, decay_rate)
-    opt = tf.keras.optimizers.Adam(learning_rate_fn)
-    model = models.Model(inputs=inputs, outputs=outputs[-1], name='HPE')
+    # initial_learning_rate = 1e-03
+    # decay_steps = 12.0
+    # decay_rate = 0.2
+    # learning_rate_fn = tf.keras.optimizers.schedules.InverseTimeDecay(initial_learning_rate, decay_steps, decay_rate)
+    # opt = tf.keras.optimizers.Adam(learning_rate_fn)
+    model = models.Model(inputs=inputs, outputs=outputs[-1], name='FacialLandmarkDetector_TCN')
     model.compile(optimizer=opt, loss='mse')
     model.build((None, 256, 256, 3))
     model.summary()

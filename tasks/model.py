@@ -120,11 +120,11 @@ def NME(y_true, y_pred):
 
 def lr_scheduler(epoch, lr):
     if epoch == 20:
+        return 1e-03
+    if epoch == 35:
         return 1e-04
-    if epoch == 30:
+    if epoch == 50:
         return 1e-05
-    if epoch == 40:
-        return 1e-06
     return lr
 
 def FacialLandmarkDetector(num_modules=4):
@@ -179,10 +179,17 @@ def FacialLandmarkDetector(num_modules=4):
             ll = layers_dict['bl' + str(i)](ll)
             tmp_out_ = layers_dict['al' + str(i)](tmp_out)
             previous = previous + ll + tmp_out_
-                    
-    opt = tf.keras.optimizers.Adam(learning_rate=1e-03)
-    model = models.Model(inputs=inputs, outputs=outputs[-1], name='HPE')
-    model.compile(optimizer=opt, loss=HeatmapLoss)
+    
+    # initial_learning_rate = 1e-03
+    # decay_steps = 12.0
+    # decay_rate = 0.2
+    # learning_rate_fn = tf.keras.optimizers.schedules.InverseTimeDecay(initial_learning_rate, decay_steps, decay_rate)
+    # opt = tf.keras.optimizers.Adam(learning_rate_fn)
+    opt = tf.keras.optimizers.RMSprop(
+        learning_rate=1e-04, rho=0.9, momentum=0.0, epsilon=1e-07, centered=False,
+        name='RMSprop')
+    model = models.Model(inputs=inputs, outputs=outputs[-1], name='FacialLandmarkDetector')
+    model.compile(optimizer=opt, loss='mse')
     model.build((None, 256, 256, 3))
     model.summary()
 
