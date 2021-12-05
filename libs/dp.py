@@ -9,40 +9,40 @@ import libs.utils
 
 import matplotlib.pyplot as plt
 
-class GenerateHeatmap():
-    def __init__(self, output_res, num_parts):
-        self.output_res = output_res
-        self.num_parts = num_parts
-        sigma = self.output_res/64
-        self.sigma = sigma
-        size = 6 * sigma + 3
-        x = np.arange(0, size, 1, float)
-        y = x[:, np.newaxis]
-        x0, y0 = 3 * sigma + 1, 3 * sigma + 1
-        self.g = np.exp(- ((x - x0) ** 2 + (y - y0) ** 2) / (2 * sigma ** 2))
+# class GenerateHeatmap():
+#     def __init__(self, output_res, num_parts, scale):
+#         self.output_res = output_res
+#         self.num_parts = num_parts
+#         sigma = self.output_res / 64 * scale
+#         self.sigma = sigma
+#         size = 6 * sigma + 3
+#         x = np.arange(0, size, 1, float)
+#         y = x[:, np.newaxis]
+#         x0, y0 = 3 * sigma + 1, 3 * sigma + 1
+#         self.g = np.exp(- ((x - x0) ** 2 + (y - y0) ** 2) / (2 * sigma ** 2))
 
-    def __call__(self, keypoints):
-        # from keypoints, return heatmaps
-        hms = np.zeros(shape=(self.output_res, self.output_res,
-                       self.num_parts), dtype=np.float32)
-        sigma = self.sigma
+#     def __call__(self, keypoints):
+#         # from keypoints, return heatmaps
+#         hms = np.zeros(shape=(self.output_res, self.output_res,
+#                        self.num_parts), dtype=np.float32)
+#         sigma = self.sigma
 
-        for idx, pt in enumerate(keypoints):
-            if pt[0] > 0:
-                x, y = int(pt[0]), int(pt[1])
-                if x < 0 or y < 0 or x >= self.output_res or y >= self.output_res:
-                    continue
-                ul = int(x - 3 * sigma - 1), int(y - 3 * sigma - 1)
-                br = int(x + 3 * sigma + 2), int(y + 3 * sigma + 2)
+#         for idx, pt in enumerate(keypoints):
+#             if pt[0] > 0:
+#                 x, y = int(pt[0]), int(pt[1])
+#                 if x < 0 or y < 0 or x >= self.output_res or y >= self.output_res:
+#                     continue
+#                 ul = int(x - 3 * sigma - 1), int(y - 3 * sigma - 1)
+#                 br = int(x + 3 * sigma + 2), int(y + 3 * sigma + 2)
 
-                c, d = max(0, -ul[0]), min(br[0], self.output_res) - ul[0]
-                a, b = max(0, -ul[1]), min(br[1], self.output_res) - ul[1]
+#                 c, d = max(0, -ul[0]), min(br[0], self.output_res) - ul[0]
+#                 a, b = max(0, -ul[1]), min(br[1], self.output_res) - ul[1]
 
-                cc, dd = max(0, ul[0]), min(br[0], self.output_res)
-                aa, bb = max(0, ul[1]), min(br[1], self.output_res)
-                hms[aa:bb, cc:dd, idx] = np.maximum(
-                    hms[aa:bb, cc:dd, idx], self.g[a:b, c:d])
-        return hms
+#                 cc, dd = max(0, ul[0]), min(br[0], self.output_res)
+#                 aa, bb = max(0, ul[1]), min(br[1], self.output_res)
+#                 hms[aa:bb, cc:dd, idx] = np.maximum(
+#                     hms[aa:bb, cc:dd, idx], self.g[a:b, c:d])
+#         return hms
 
 class Dataset():
     def __init__(self, img_res, hms_res, num_parts, csv_dir):
@@ -53,8 +53,9 @@ class Dataset():
         self.base_dir = os.path.dirname(self.csv_dir)
         self.load_datalist(self.csv_dir)
         self.idx_list = np.arange(len(self.train_list))
-
-        self.generateHeatmap = GenerateHeatmap(self.hms_res, num_parts)
+        self.hmscale = hms_res * 2 / 64
+        print(f'scale: {self.hmscale}')
+        # self.generateHeatmap = GenerateHeatmap(self.hms_res, num_parts, self.hmscale)
 
     def load_datalist(self, csv_dir):
         self.df = pd.read_csv(csv_dir)
@@ -96,7 +97,7 @@ class Dataset():
         orig_img = self.random_color_augmentation(orig_img)
 
         cropped = libs.utils.crop_and_normalize(orig_img, center, scale)
-        heatmaps = libs.utils.create_target_heatmap(orig_kps, center, scale)
+        heatmaps = libs.utils.create_target_heatmap(orig_kps, self.hms_res, center, scale, self.hmscale)
 
         # heatmap = np.zeros((self.hms_res, self.hms_res))
         # for i in range(heatmaps.shape[2]):
@@ -118,13 +119,9 @@ class Dataset():
         image_file, label_file = self.train_list[idx]
         orig_img = self.get_img(image_file)
         orig_kps, center, scale = self.get_label(label_file)
-        
-        # orig_img, orig_kps = self.random_rotate(orig_img, orig_kps, center)
-        
-        # orig_img = self.random_color_augmentation(orig_img)
 
         cropped = libs.utils.crop_and_normalize(orig_img, center, scale)
-        kps = libs.utils.create_target_landmarks(orig_kps, center, scale, 64)
+        kps = libs.utils.create_target_landmarks(orig_kps, center, scale, self.hms_res)
 
         return cropped, kps, center, scale
 
@@ -183,6 +180,18 @@ class Dataset():
             image, landmarks, center, scale = self.load_eval(idx)
             yield image, landmarks, center, scale
 
+    def tf_eval_dataset_from_generator(self, batch_size):
+        return tf.data.Dataset.from_generator(
+            self.gen_eval,
+            output_types=(
+                np.float32, np.float32, np.float32, np.float32),
+            output_shapes=(
+                [self.img_res, self.img_res, 3],
+                [self.num_parts, 2],
+                2, None),
+            args=()
+        ).shuffle(128, reshuffle_each_iteration=True).repeat().batch(batch_size)
+
     def tf_dataset_from_generator(self, batch_size):
         return tf.data.Dataset.from_generator(
             self.gen,
@@ -192,7 +201,7 @@ class Dataset():
                 [self.img_res, self.img_res, 3],
                 [self.hms_res, self.hms_res, self.num_parts]),
             args=()
-        ).repeat().batch(batch_size)
+        ).shuffle(128, reshuffle_each_iteration=True).repeat().batch(batch_size)
 
     # for VGG-16
     def load_with_no_heatmaps(self, idx):
@@ -224,4 +233,8 @@ class Dataset():
 if __name__ == "__main__":
     # dataset = Dataset(256, 64, 68, '../Data/300W_train/train.csv')
     # dataset.load_image(4)
-    dataset = Dataset(256, 64, 68, '../Data/300W/eval.csv')
+    scale = 256
+    dataset = Dataset(256, scale, 68, '../Data/300W/eval.csv')
+    img, hm = dataset.load_image(0)
+    print(hm.shape)
+    plt.imsave(f'hm_{scale}.png', hm[:,:,0])

@@ -1,17 +1,20 @@
-from tasks.model_TCN import FacialLandmarkDetector
+import importlib
+MODEL_NAME = 'SHG_TCN'
+
 from libs.dp import Dataset
 import tensorflow as tf
 import pickle
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 print(tf.config.list_physical_devices('GPU'))
 
-model = FacialLandmarkDetector()
+model_lib = importlib.import_module('tasks.model_' + MODEL_NAME)
+model = model_lib.FacialLandmarkDetector()
 
 # checkpoint
 
-checkpoint_path = "data/checkpoint_model_TCN/cp-{epoch:04d}.ckpt"
+checkpoint_path = os.path.join(f'data/checkpoint_model_{MODEL_NAME}', 'cp-{epoch:04d}.ckpt')
 checkpoint_dir = os.path.dirname(checkpoint_path)
 
 cp_callback = tf.keras.callbacks.ModelCheckpoint(
@@ -33,5 +36,5 @@ dataset_generator = dataset.tf_dataset_from_generator(BATCH_SIZE)
 
 hist = model.fit(dataset_generator.take(240), callbacks=[cp_callback], epochs=100)
 
-with open('hist_SHG_TCN.pickle', 'wb') as f:
-    pickle.dump(hist, f)
+with open(f'data/hist_{MODEL_NAME}.pickle', 'wb') as f:
+    pickle.dump(hist.history, f)

@@ -5,7 +5,6 @@ from tensorflow.keras import datasets, layers, models
 from tensorflow.keras import Model as model
 from tensorflow.keras import Input
 
-
 '''
     HourGlass module에서 사용되는 convolution layer block입니다.
 '''
@@ -196,17 +195,19 @@ def FacialLandmarkDetector(num_modules=4):
             tmp_out_ = layers_dict['al' + str(i)](tmp_out)
             previous = previous + ll + tmp_out_
     
-    # initial_learning_rate = 1e-03
-    # decay_steps = 12.0
-    # decay_rate = 0.2
-    # learning_rate_fn = tf.keras.optimizers.schedules.InverseTimeDecay(initial_learning_rate, decay_steps, decay_rate)
+    initial_learning_rate = 1e-03
+    decay_steps = 15.0
+    decay_rate = 0.1
+    learning_rate_fn = tf.keras.optimizers.schedules.InverseTimeDecay(
+        initial_learning_rate, decay_steps, decay_rate)
     # opt = tf.keras.optimizers.Adam(learning_rate_fn)
-    opt = tf.keras.optimizers.RMSprop(
-        learning_rate=1e-04, rho=0.9, momentum=0.0, epsilon=1e-07, centered=False,
-        name='RMSprop')
+    opt = tf.keras.optimizers.RMSprop(learning_rate_fn)
+    # opt = tf.keras.optimizers.RMSprop(
+    #     learning_rate=1e-04, rho=0.9, momentum=0.0, epsilon=1e-07, centered=False,
+    #     name='RMSprop')
     model = models.Model(inputs=inputs, outputs=outputs[-1], name='FacialLandmarkDetector_TCN')
     model.compile(optimizer=opt, loss='mse')
     model.build((None, 256, 256, 3))
-    model.summary()
+    # model.summary()
 
     return model

@@ -82,7 +82,7 @@ def create_bounding_box(target_landmarks, expansion_factor=0.0):
     return np.concatenate((x_y_min, x_y_max), axis=1)
 
 def _gaussian(
-        size=3, sigma=0.25, amplitude=1, normalize=False, width=None,
+        size=3, sigma=0.15, amplitude=1, normalize=False, width=None,
         height=None, sigma_horz=None, sigma_vert=None, mean_horz=0.5,
         mean_vert=0.5):
     # handle some defaults
@@ -112,7 +112,7 @@ def draw_gaussian(image, point, sigma):
     br = [math.floor(point[0] + 3 * sigma), math.floor(point[1] + 3 * sigma)]
     if (ul[0] > image.shape[1] or ul[1] > image.shape[0] or br[0] < 1 or br[1] < 1):
         return image
-    size = 6 * sigma + 1
+    size = int(6 * sigma + 1)
     g = _gaussian(size)
     g_x = [int(max(1, -ul[0])), int(min(br[0], image.shape[1])) - int(max(1, ul[0])) + int(max(1, -ul[0]))]
     g_y = [int(max(1, -ul[1])), int(min(br[1], image.shape[0])) - int(max(1, ul[1])) + int(max(1, -ul[1]))]
@@ -124,11 +124,11 @@ def draw_gaussian(image, point, sigma):
     image[image > 1] = 1
     return image
 
-def create_target_heatmap(target_landmarks, centers, scales):
-    heatmaps = np.zeros((64, 64, 68), dtype=np.float32)
+def create_target_heatmap(target_landmarks, hm_res, centers, scales, hmscale):
+    heatmaps = np.zeros((hm_res, hm_res, 68), dtype=np.float32)
     for p in range(68):
-        landmark_cropped_coor = transform(target_landmarks[p] + 1, centers, scales, (64, 64), invert=False)
-        heatmaps[:,:,p] = draw_gaussian(heatmaps[:,:,p], landmark_cropped_coor + 1, 1)
+        landmark_cropped_coor = transform(target_landmarks[p] + 1, centers, scales, (hm_res, hm_res), invert=False)
+        heatmaps[:,:,p] = draw_gaussian(heatmaps[:,:,p], landmark_cropped_coor + 1, hmscale)
     return heatmaps
 
 def create_target_landmarks(target_landmarks, center, scale, size):
