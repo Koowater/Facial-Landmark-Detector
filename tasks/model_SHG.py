@@ -218,7 +218,7 @@ class FacialLandmarkDetector(model):
             self.layers_dict['top_m_' + str(hg_module)] = ConvBlock(256, 256)
             self.layers_dict['conv_last' + str(hg_module)] = layers.Conv2D(256, (1, 1), padding='valid', strides=1)
             self.layers_dict['bn_end' + str(hg_module)] = layers.BatchNormalization()
-            self.layers_dict['l' + str(hg_module)] = layers.Conv2D(num_parts, (1, 1), padding='valid', strides=1) # 1 heatmaps
+            self.layers_dict['l' + str(hg_module)] = layers.Conv2D(num_parts, (1, 1), padding='valid', strides=1)
             
             if hg_module < self.num_modules - 1:
                 self.layers_dict['bl' + str(hg_module)] = layers.Conv2D(256, (1, 1), padding='valid', strides=1)

@@ -1,6 +1,73 @@
 import numpy as np
 import cv2
 import math
+import tensorflow as tf
+import eval
+
+class my_loss(tf.keras.losses.Loss):
+    def __init__(self, NM=None, HM=None,  L2=None, imgSize=256, HMSize=64, batchSize = 8):
+        super(my_loss, self).__init__()
+        # Loss Check Parameter
+        self.NM = NM
+        self.HM = HM
+        self.L2 = L2
+
+        # Loss Using Value
+        self.imgSize   = imgSize
+        self.HMSize    = HMSize
+        self.batchSize = batchSize
+
+    def call(self, y_ture, y_pred):
+        loss_value = 0
+
+        if self.NM is not None:
+            loss_value += self.NME(y_ture, y_pred)
+
+        if self.HM is not None:
+            loss_value += self.HeatmapLoss(y_ture, y_pred)
+        
+        if self.L2 is not None:
+            loss_value += self.L2Loss(y_ture, y_pred)
+        
+        return loss_value
+
+    def NME(self, y_true, y_pred):
+        return tf.reduce_mean(tf.keras.losses.MSE(y_true, y_pred))
+
+    def HeatmapLoss(self, y_true, y_pred):
+        l = ((y_pred - y_true)**2)
+        l = tf.reduce_mean(tf.reduce_mean(tf.reduce_mean(l, 3), 2), 1)
+        return l ## l of dim bsize
+    
+    def L2Loss(self, y_true, y_pred):
+        loss = 0
+        for t, p  in zip(y_true, y_pred):
+            t = eval.parse_heatmap(t) * self.imgSize / self.HMSize
+            p = eval.parse_heatmap(p) * self.imgSize / self.HMSize
+            loss += eval.l2_distance(p, t)
+        
+        return loss / self.batchSize
+
+        # for i, pred in enumerate(y_pred):
+        # eval.l2_distance(pred_kps[i], kps[i])
+
+
+
+def NME(y_true, y_pred):
+    return tf.reduce_mean(tf.keras.losses.MSE(y_true, y_pred))
+
+def lr_scheduler(epoch, lr):
+    if epoch == 15:
+        return 1e-05
+    if epoch == 30 :
+        return 1e-06
+    return lr
+
+# Loss function
+def HeatmapLoss(y_true, y_pred):
+    l = ((y_pred - y_true)**2)
+    l = tf.reduce_mean(tf.reduce_mean(tf.reduce_mean(l, 3), 2), 1)
+    return l ## l of dim bsize
 
 def get_transform(center, scale, res, rot=0):
     # Generate transformation matrix

@@ -69,11 +69,17 @@ initial_learning_rate = 1e-04
 decay_steps = 10.0
 decay_rate = 5.
 
+# Hyper Parameter
+# learning_rate_fn = tf.keras.optimizers.schedules.InverseTimeDecay(initial_learning_rate, decay_steps, decay_rate)
+optimizer        = tf.keras.optimizers.RMSprop(learning_rate=0.0001)
+# loss_fn          = my_loss(True, None, True)
+loss_fn = NME
+
 model_path = 'tasks.model_' + MODEL_NAME
-model = importlib.import_module(model_path).FacialLandmarkDetector()
+model = importlib.import_module(model_path).FAN(4)
 print(f'model_path: {model_path}')
-model.build(input_shape=((BATCH_SIZE, 256, 256, 3)))
-model.summary()
+model.build(input_shape=((None, 256, 256, 3)))
+model.compile(loss=NME, optimizer=optimizer)
 
 # Set Dataset
 DATASET_DIR    = '../Datasets/300W_train/train.csv'
@@ -90,10 +96,6 @@ dataset_generator = dataset.tf_dataset_from_generator(BATCH_SIZE)
 eval_dataset      = Dataset(256, HM_SIZE, 68, '../Datasets/300W/eval.csv')
 EVAL_STEPS        = np.ceil(600 / BATCH_SIZE).astype(int)
 
-# Hyper Parameter
-# learning_rate_fn = tf.keras.optimizers.schedules.InverseTimeDecay(initial_learning_rate, decay_steps, decay_rate)
-optimizer        = tf.keras.optimizers.RMSprop(learning_rate=0.0001)
-loss_fn          = my_loss(True, None, True)
 
 print(f'\nEpochs: {EPOCHS}, Total step: {TOTAL_STEP}, Batch size: {BATCH_SIZE}')
 

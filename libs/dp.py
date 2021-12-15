@@ -53,7 +53,7 @@ class Dataset():
         self.base_dir = os.path.dirname(self.csv_dir)
         self.load_datalist(self.csv_dir)
         self.idx_list = np.arange(len(self.train_list))
-        self.hmscale = hms_res * 2 / 64
+        self.hmscale = hms_res / 64
         print(f'scale: {self.hmscale}')
         # self.generateHeatmap = GenerateHeatmap(self.hms_res, num_parts, self.hmscale)
 
@@ -87,7 +87,7 @@ class Dataset():
         return img
 
     def load_image(self, idx):
-        ## load + crop
+        # load + crop
         image_file, label_file = self.train_list[idx]
         orig_img = self.get_img(image_file)
         orig_kps, center, scale = self.get_label(label_file)
@@ -163,9 +163,10 @@ class Dataset():
 
         a = 1.0 + (np.random.random() - 0.5) * 0.4
         b = np.random.randint(-20, 20)
-
+        dst = dst.astype(np.float32)
         dst = dst * a + b
         dst = np.clip(dst, 0, 255)
+        dst = dst.astype(np.uint8)
 
         return dst
 
@@ -233,8 +234,15 @@ class Dataset():
 if __name__ == "__main__":
     # dataset = Dataset(256, 64, 68, '../Data/300W_train/train.csv')
     # dataset.load_image(4)
-    scale = 256
-    dataset = Dataset(256, scale, 68, '../Data/300W/eval.csv')
+    scale = 64
+    dataset = Dataset(256, scale, 68, '../Datasets/300W/eval.csv')
     img, hm = dataset.load_image(0)
+    
+    rotation = [-5., 0., 5.]
+    saturation = [-0.6, 1., 1.4]
+    contrast = [0.8, 1., 1.2]
+    brightness = [-20, 0, 20]
+
+    print(img.max(), img.min())
     print(hm.shape)
-    plt.imsave(f'hm_{scale}.png', hm[:,:,0])
+    print(hm.max(), hm.min())
