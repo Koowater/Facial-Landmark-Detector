@@ -3,4 +3,5 @@
 /data/tensorboard
 
 __pycache__
-*__pycache__
+libs/__pycache__
+*.pyc
