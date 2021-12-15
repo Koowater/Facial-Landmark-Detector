@@ -7,3 +7,5 @@ libs/__pycache__
 data/__pycache__
 tasks/__pycache__
 *.pyc
+
+.vscode
