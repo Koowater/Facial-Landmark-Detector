@@ -83,7 +83,7 @@ class HourGlass(model):
         for conv_module in range(num_modules):
             self.layers_dict['b3_' + str(level) + '_' + str(conv_module)] = ConvBlock(self.features, self.features)
         self.layers_dict['bn'] = layers.BatchNormalization()
-        self.layers_dict['conv2dtranspose'] = layers.Conv2DTranspose(256, (4, 4), strides=2, padding='same')
+        self.layers_dict['conv2dtranspose'] = layers.Conv2DTranspose(256, (2, 2), strides=2, padding='valid')
     
     def _call(self, num_modules, level, inp):
         # Upper branch

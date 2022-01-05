@@ -64,26 +64,15 @@ NUM_LANDMARKS = 68
 IMG_RES       = 256
 EPOCHS        = 120
 TOTAL_STEP    = np.ceil(3837 / BATCH_SIZE).astype(int)
-# TOTAL_STEP = 1
 
 initial_learning_rate = 1e-04
 decay_steps = 10.0
 decay_rate = 5.
 
-# Hyper Parameter
-# learning_rate_fn = tf.keras.optimizers.schedules.InverseTimeDecay(initial_learning_rate, decay_steps, decay_rate)
-optimizer        = tf.keras.optimizers.Adam(learning_rate=0.0001)
-# loss_fn          = my_loss(True, None, True)
-loss_fn = NME
-
 model_path = 'tasks.model_' + MODEL_NAME
-FAN = importlib.import_module(model_path).FAN(4, 256, 68)
-inputs = tf.keras.Input(shape=(256, 256, 3))
-outputs = FAN(inputs)
-model = tf.keras.Model(inputs=inputs, outputs=outputs)
+model = importlib.import_module(model_path).FacialLandmarkDetector()
 print(f'model_path: {model_path}')
-model.build(input_shape=((None, 256, 256, 3)))
-model.compile(loss=NME, optimizer=optimizer)
+model.build(input_shape=((BATCH_SIZE, 256, 256, 3)))
 model.summary()
 
 # Set Dataset
@@ -101,6 +90,11 @@ dataset_generator = dataset.tf_dataset_from_generator(BATCH_SIZE)
 eval_dataset      = Dataset(256, HM_SIZE, 68, '../Datasets/300W/eval.csv')
 EVAL_STEPS        = np.ceil(600 / BATCH_SIZE).astype(int)
 
+# Hyper Parameter
+# learning_rate_fn = tf.keras.optimizers.schedules.InverseTimeDecay(initial_learning_rate, decay_steps, decay_rate)
+optimizer        = tf.keras.optimizers.RMSprop(learning_rate=0.0001)
+# loss_fn          = my_loss(True, None, True)
+loss_fn          = NME
 
 print(f'\nEpochs: {EPOCHS}, Total step: {TOTAL_STEP}, Batch size: {BATCH_SIZE}')
 
@@ -120,28 +114,13 @@ for epoch in range(EPOCHS):
             # cv2.imshow('test', test_image)
             # cv2.waitKey(0)
             # cv2.destroyAllWindows()
-            full_predictions = model(images)
-            predictions = full_predictions[:,-1,:,:,:]
+            predictions = model(images)
             loss_value = loss_fn(labels, predictions)
-        # print(labels.shape)
-        # print(predictions.shape)
-        # print(loss_value.shape)
+        
         grads = tape.gradient(loss_value, model.trainable_weights)
         optimizer.apply_gradients(zip(grads, model.trainable_weights))
         cur_time = datetime.datetime.now().strftime("%X")
         print(f'[{cur_time}] Epoch: {epoch:3} | Step: {step+1:<3} / {TOTAL_STEP} | Loss: {tf.reduce_mean(loss_value):.10f}')
-    
-    swap_pred = np.swapaxes(np.array([labels[0]]), 0, 3)
-    # for hm_idx, hm in enumerate(swap_pred):
-    #     plt.subplot(10, 7, hm_idx + 1)
-    #     plt.xticks([])
-    #     plt.yticks([])
-    #     plt.grid(False)
-    #     plt.imshow(hm, cmap=plt.cm.plasma)
-    print(swap_pred[0].shape)
-    with summary_writer.as_default():
-        plt.imshow(swap_pred[0])
-        tf.summary.image('label', plot_to_image(figure), step=epoch)
 
     # Checkpoint
     checkpoint_path = os.path.join(CP_DIR, f'model_{MODEL_NAME}', f'cp-{epoch:04}.ckpt')

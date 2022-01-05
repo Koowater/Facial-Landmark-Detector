@@ -1,9 +1,28 @@
 import numpy as np
+import io
 import cv2
 import math
 import tensorflow as tf
-import eval
 
+import matplotlib.pyplot as plt
+from libs import eval
+
+def plot_to_image(figure):
+    """Converts the matplotlib plot specified by 'figure' to a PNG image and
+    returns it. The supplied figure is closed and inaccessible after this call."""
+    # Save the plot to a PNG in memory.
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    # Closing the figure prevents it from being displayed directly inside
+    # the notebook.
+    plt.close(figure)
+    buf.seek(0)
+    # Convert PNG buffer to TF image
+    image = tf.image.decode_png(buf.getvalue(), channels=4)
+    # Add the batch dimension
+    image = tf.expand_dims(image, 0)
+    return image
+  
 class my_loss(tf.keras.losses.Loss):
     def __init__(self, NM=None, HM=None,  L2=None, imgSize=256, HMSize=64, batchSize = 8):
         super(my_loss, self).__init__()
@@ -51,6 +70,27 @@ class my_loss(tf.keras.losses.Loss):
         # for i, pred in enumerate(y_pred):
         # eval.l2_distance(pred_kps[i], kps[i])
 
+class LandmarkLoss(tf.keras.metrics.Metric):
+    def __init__(self, img_size, hm_size, name='landmark_loss', **kwargs):
+        super(LandmarkLoss, self).__init__(name=name, **kwargs)
+        self.landmark_loss = self.add_weight(name='ls', initializer='zeros')
+        self.img_size = img_size
+        self.hm_size = hm_size
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        y_true = eval.parse_heatmap(y_true) * self.img_size / self.hm_size
+        y_pred = eval.parse_heatmap(y_pred) * self.img_size / self.hm_size
+        values = eval.l2_distance(y_pred, y_true)
+
+        if sample_weight is not None:
+            sample_weight = tf.cast(sample_weight, self.dtype)
+            sample_weight = tf.broadcast_to(sample_weight, values.shape)
+            values = tf.multiply(values, sample_weight)
+        
+        self.landmark_loss.assign_add(tf.reduce_sum(values))
+
+    def result(self):
+        return self.landmark_loss
 
 
 def NME(y_true, y_pred):

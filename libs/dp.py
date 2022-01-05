@@ -4,45 +4,13 @@ import os
 import numpy as np
 import tensorflow as tf
 import pandas as pd
-sys.path.append(os.path.abspath(os.getcwd()))
-import libs.utils
-
 import matplotlib.pyplot as plt
 
-# class GenerateHeatmap():
-#     def __init__(self, output_res, num_parts, scale):
-#         self.output_res = output_res
-#         self.num_parts = num_parts
-#         sigma = self.output_res / 64 * scale
-#         self.sigma = sigma
-#         size = 6 * sigma + 3
-#         x = np.arange(0, size, 1, float)
-#         y = x[:, np.newaxis]
-#         x0, y0 = 3 * sigma + 1, 3 * sigma + 1
-#         self.g = np.exp(- ((x - x0) ** 2 + (y - y0) ** 2) / (2 * sigma ** 2))
+sys.path.append(os.path.abspath(os.getcwd()))
 
-#     def __call__(self, keypoints):
-#         # from keypoints, return heatmaps
-#         hms = np.zeros(shape=(self.output_res, self.output_res,
-#                        self.num_parts), dtype=np.float32)
-#         sigma = self.sigma
+import libs.utils
 
-#         for idx, pt in enumerate(keypoints):
-#             if pt[0] > 0:
-#                 x, y = int(pt[0]), int(pt[1])
-#                 if x < 0 or y < 0 or x >= self.output_res or y >= self.output_res:
-#                     continue
-#                 ul = int(x - 3 * sigma - 1), int(y - 3 * sigma - 1)
-#                 br = int(x + 3 * sigma + 2), int(y + 3 * sigma + 2)
 
-#                 c, d = max(0, -ul[0]), min(br[0], self.output_res) - ul[0]
-#                 a, b = max(0, -ul[1]), min(br[1], self.output_res) - ul[1]
-
-#                 cc, dd = max(0, ul[0]), min(br[0], self.output_res)
-#                 aa, bb = max(0, ul[1]), min(br[1], self.output_res)
-#                 hms[aa:bb, cc:dd, idx] = np.maximum(
-#                     hms[aa:bb, cc:dd, idx], self.g[a:b, c:d])
-#         return hms
 
 class Dataset():
     def __init__(self, img_res, hms_res, num_parts, csv_dir):
@@ -55,13 +23,12 @@ class Dataset():
         self.idx_list = np.arange(len(self.train_list))
         self.hmscale = hms_res / 64
         print(f'scale: {self.hmscale}')
-        # self.generateHeatmap = GenerateHeatmap(self.hms_res, num_parts, self.hmscale)
 
     def load_datalist(self, csv_dir):
         self.df = pd.read_csv(csv_dir)
         del self.df['Unnamed: 0']
         self.train_list = self.df.values.tolist()
-        print(f'Train dataset: {self.csv_dir}')
+        print(f'\nTrain dataset: {self.csv_dir}')
         print(f'Train dataset is loaded. Shape: {self.df.shape}')
 
     def get_path(self, path):
@@ -142,8 +109,7 @@ class Dataset():
     def random_rotate(self, image, kps, center):
         src = image
         angle = np.random.uniform(-5., 5.)
-        # print(f'angle: {angle}')
-        height, width, channel = src.shape
+        height, width, _ = src.shape
         matrix = cv2.getRotationMatrix2D(tuple(center), -angle, 1)
         dst = cv2.warpAffine(src, matrix, (width, height))
         rotated_landmarks = self.rotate_landmarks(kps, angle, center)
@@ -154,6 +120,7 @@ class Dataset():
         hsv = cv2.cvtColor(src, cv2.COLOR_RGB2HSV)
         h, s, v = cv2.split(hsv)
         i = (np.random.random() - 0.5) * 0.8
+        # img = tf.image.adjust_saturation(src, i)
         s = s * (1 - i)
         s = np.clip(s, 0, 255)
         s = np.ndarray.astype(s, 'uint8')
@@ -164,6 +131,8 @@ class Dataset():
         a = 1.0 + (np.random.random() - 0.5) * 0.4
         b = np.random.randint(-20, 20)
         dst = dst.astype(np.float32)
+        # img = tf.image.adjust_contrast(img, a)
+        # img = tf.image.adjust_brightness(img, b)
         dst = dst * a + b
         dst = np.clip(dst, 0, 255)
         dst = dst.astype(np.uint8)

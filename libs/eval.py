@@ -1,30 +1,32 @@
 import matplotlib.pyplot as plt
-import copy
 import numpy as np
 import cv2
 import tensorflow as tf
-from tqdm import tqdm
-import sys
 import io
 
 def l2_distance(a, b):
     d = a - b
     error = 0.
     for i, p in enumerate(d):
-        error += np.sqrt(p[0] ** 2 + p[1] ** 2)
+        error += tf.math.sqrt(p[0] ** 2 + p[1] ** 2)
     error = error / d.shape[0]
     return error
 
 def parse_heatmap(hms):
-    pred_kps = np.zeros((hms.shape[-1], 2))
-    size = hms.shape[0]
-    for i in range(hms.shape[-1]):
-        hm = hms[:,:,i]
-        idx = np.argmax(hm)
-        x = idx % size
-        y = idx // size
-        pred_kps[i] = np.array([x, y])
-    return pred_kps
+    if hms.shape[0] == None:
+        pred_kps = tf.Variable(np.zeros((1, hms.shape[-1], 2)), dtype=tf.float32)
+    else:
+        pred_kps = tf.Variable(np.zeros((hms.shape[0], hms.shape[-1], 2)), dtype=tf.float32)
+    size = hms.shape[-2]
+    
+    for i, hm in enumerate(hms):
+        flatten = tf.reshape(hm, (hm.shape[0] * hm.shape[1], hm.shape[2]))
+        argmax = tf.argmax(flatten, axis=0)
+        argmax_x = argmax % hm.shape[1]
+        argmax_y = argmax // hm.shape[0]
+        pred_kp = tf.stack([argmax_x, argmax_y], axis=1)
+        pred_kps[i].assign(tf.cast(pred_kp, tf.float32))
+    return tf.convert_to_tensor(pred_kps)
 
 def plot_to_image(figure):
     """Converts the matplotlib plot specified by 'figure' to a PNG image and
@@ -41,3 +43,5 @@ def plot_to_image(figure):
     # Add the batch dimension
     image = tf.expand_dims(image, 0)
     return image
+
+

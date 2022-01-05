@@ -1,6 +1,7 @@
 /data/checkpoint*
 /data/saved*
 /data/tensorboard
+/data/result
 
 __pycache__
 libs/__pycache__

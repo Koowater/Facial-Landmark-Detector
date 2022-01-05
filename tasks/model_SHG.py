@@ -85,7 +85,7 @@ class HourGlass(model):
         up1 = self.layers_dict['b1_' + str(level)](up1)
         
         # Lower branch
-        low1 = layers.AveragePooling2D((2, 2), strides=(2, 2))(inp)
+        low1 = layers.AveragePooling2D((2, 2), strides=(2, 2))(inp) # maxpooling 이여야 할 것 같은데...
         low1 = self.layers_dict['b2_' + str(level)](low1)
         
         if level > 1:
