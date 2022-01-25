@@ -1,261 +1,168 @@
-import numpy as np
 import tensorflow as tf
-from tensorflow.keras import datasets, layers, models
-from tensorflow.keras import Model as model
-from tensorflow.keras import Input
+from tensorflow import keras
+from tensorflow.keras import layers
+from tensorflow.keras import Model
 
-'''
-    HourGlass module에서 사용되는 convolution layer block입니다.
-'''
-class ConvBlock(model):
-    def __init__(self, in_planes, out_planes):
-        super(ConvBlock, self).__init__()
+class Residual(layers.Layer):
+    def __init__(self, in_ch, out_ch):
+        super(Residual, self).__init__()
         
-        if in_planes != out_planes:
-            self.downsample = 1
-            # Pytorch : 
-            self.dsbn = layers.BatchNormalization()
-            self.dsrl = layers.Activation('relu')
-            self.dsconv = layers.Conv2D(out_planes, (1, 1), padding='same', strides=(1, 1), use_bias=False)
+        self.relu = layers.Activation('relu')
+
+        if in_ch != out_ch:
+            self.downsample = True
+            self.downblock = [
+                layers.BatchNormalization(),
+                layers.Activation('relu'),
+                layers.Conv2D(out_ch, (1, 1), padding='same', strides=1, use_bias=False)
+            ]
         else:
-            self.downsample = 0
-            
+            self.downsample = False
+
         self.bn1 = layers.BatchNormalization()
-        self.conv1 = layers.Conv2D(int(out_planes / 2), (3, 3), padding='same', strides=(1, 1), use_bias=False)
+        self.conv1 = layers.Conv2D(int(out_ch / 2), kernel_size=(3, 3), strides=1, padding='same', use_bias=False)
         self.bn2 = layers.BatchNormalization()
-        self.conv2 = layers.Conv2D(int(out_planes / 4), (3, 3), padding='same', strides=(1, 1), use_bias=False)
+        self.conv2 = layers.Conv2D(int(out_ch / 2), kernel_size=(3, 3), strides=1, padding='same', use_bias=False)
         self.bn3 = layers.BatchNormalization()
-        self.conv3 = layers.Conv2D(int(out_planes / 4), (3, 3), padding='same', strides=(1, 1), use_bias=False)
-        
-    def call(self, input_tensor):
-        residual = input_tensor
-        
-        out1 = self.bn1(input_tensor)
-        out1 = tf.nn.relu(out1)
-        out1 = self.conv1(out1)
-        
-        out2 = self.bn2(out1)
-        out2 = tf.nn.relu(out2)
-        out2 = self.conv2(out2)
-        
-        out3 = self.bn3(out2)
-        out3 = tf.nn.relu(out3)
-        out3 = self.conv3(out3)
-        
-        # residual
-        out3 = tf.concat([out1, out2, out3], 3)        
+        self.conv3 = layers.Conv2D(out_ch, kernel_size=(3, 3), strides=1, padding='same', use_bias=False)
 
-        if self.downsample == 1:
-            residual = self.dsbn(residual)
-            residual = self.dsrl(residual)
-            residual = self.dsconv(residual)
-
-        #out3 += residual
-        
-        return tf.math.add(out3, residual)    
-
-
-'''
-    ConvBlock을 사용해 FAN을 구성하는 HourGlass module을 구현합니다.
-'''
-class HourGlass(model):
-    def __init__(self, num_modules, depth, num_features):
-        super(HourGlass, self).__init__()
-        self.num_modules = num_modules
-        self.depth = depth
-        self.features = num_features
-        self.layers_dict = dict()
-        
-        self._generate_network(self.depth)
-        
-    def _generate_network(self, level):
-        self.layers_dict['b1_' + str(level)] = ConvBlock(self.features, self.features)
-        self.layers_dict['b2_' + str(level)] = ConvBlock(self.features, self.features)
-            
-        if level > 1:
-            self._generate_network(level - 1) 
-        else:
-            self.layers_dict['b2_plus_' + str(level)] = ConvBlock(self.features, self.features)
-        
-        self.layers_dict['b3_' + str(level)] = ConvBlock(self.features, self.features)
-    
-    def _call(self, level, inp):
-        # Upper branch
-        up1 = inp
-        up1 = self.layers_dict['b1_' + str(level)](up1)
-        
-        # Lower branch
-        low1 = layers.AveragePooling2D((2, 2), strides=(2, 2))(inp) # maxpooling 이여야 할 것 같은데...
-        low1 = self.layers_dict['b2_' + str(level)](low1)
-        
-        if level > 1:
-            low2 = self._call(level - 1, low1)
-        else:
-            low2 = low1
-            low2 = self.layers_dict['b2_plus_' + str(level)](low2)
-            
-        low3 = low2
-        low3 = self.layers_dict['b3_' + str(level)](low3)
-        
-        up2 = layers.UpSampling2D((2, 2), interpolation='nearest')(low3)
-        
-        if up2.shape[1] != up1.shape[1]:
-            up2 = layers.ZeroPadding2D(((1, 0), (1, 0)))(up2)
-        
-        return up1 + up2
-        
     def call(self, x):
-        return self._call(self.depth, x)
+        residual = x
+
+        out = self.bn1(x)
+        out = self.relu(out)
+        out = self.conv1(out)
+        out = self.bn2(out)
+        out = self.relu(out)
+        out = self.conv2(out)
+        out = self.bn3(out)
+        out = self.relu(out)
+        out = self.conv3(out)
+        if self.downsample == True:
+            for layer in self.downblock:
+                residual = layer(residual)
+        
+        return out + residual
+
+class Hourglass(layers.Layer):
+    def __init__(self, n, f, bn=None, increase=0):
+        super(Hourglass, self).__init__()
+        nf = f + increase
+        self.up1 = Residual(f, f)
+        # Lower branch
+        self.pool1 = layers.MaxPool2D((2, 2), strides=(2, 2))
+        self.low1 = Residual(f, nf)
+        self.n = n
+        # Recursive hourglass
+        if self.n > 1:
+            self.low2 = Hourglass(n-1, nf, bn=bn)
+        else:
+            self.low2 = Residual(nf, nf)
+        self.low3 = Residual(nf, f)
+        self.up2 = layers.UpSampling2D((2, 2), interpolation='nearest')
+
+    def call(self, x):
+        up1  = self.up1(x)
+        pool1 = self.pool1(x)
+        low1 = self.low1(pool1)
+        low2 = self.low2(low1)
+        low3 = self.low3(low2)
+        up2  = self.up2(low3)
+
+        return up1 + up2
+
+class StackedHourglassNetworks(Model):
+    def __init__(self, nstack, in_ch, out_ch, bn=False, increase=0):
+        super(StackedHourglassNetworks, self).__init__()
+
+        self.nstack = nstack
+        self.pre = [
+            layers.Conv2D(64, (7, 7), 2, padding='same', use_bias=False),
+            layers.BatchNormalization(),
+            layers.Activation('relu'),
+            Residual(64, 128),
+            layers.MaxPool2D((2, 2), strides=(2, 2)),
+            Residual(128, 128),
+            Residual(128, in_ch)
+        ]
+
+        self.hgs = [
+                Hourglass(4, in_ch, bn, increase) for i in range(nstack)
+        ]
+
+        self.features = [
+                [
+                    Residual(in_ch, in_ch),
+                    layers.Conv2D(in_ch, (1, 1), use_bias=False),
+                    layers.BatchNormalization(),
+                    layers.Activation('relu')
+                    ]
+             for i in range(nstack)
+        ]
+
+        self.outs = [layers.Conv2D(out_ch, (1, 1), 1, use_bias=False) for i in range(nstack)]
+        self.merge_features = [layers.Conv2D(in_ch, (1, 1), (1, 1), use_bias=False) for i in range(nstack - 1)]
+        self.merge_preds = [layers.Conv2D(in_ch, (1, 1), (1, 1), use_bias=False) for i in range(nstack - 1)]
+        self.nstack = nstack
+
+    def call(self, imgs):
+        x = imgs
+        for layer in self.pre:
+            x = layer(x)
+        combined_hm_preds = []
+        for i in range(self.nstack):
+            hg = self.hgs[i](x)
+            feature = hg
+            for layer in self.features[i]:
+                feature = layer(feature)
+            # feature = self.features[i](hg)
+            preds = self.outs[i](feature)
+            combined_hm_preds.append(preds)
+            if i < self.nstack - 1:
+                x = x + self.merge_preds[i](preds) + self.merge_features[i](feature)
+        return combined_hm_preds[-1]
 
 
-# Loss function
-def HeatmapLoss(y_true, y_pred):
-    l = ((y_pred - y_true)**2)
-    l = tf.reduce_mean(tf.reduce_mean(tf.reduce_mean(l, 3), 2), 1)
-    return l ## l of dim bsize
+class FacialLandmarkDetector(Model):
+    def __init__(self, lm_metric, hm_size, batch_size, train_step, test_step, **kwargs):
+        super(FacialLandmarkDetector, self).__init__(**kwargs)
+        self.hm_size = hm_size
+        self.batch_size = batch_size
+        self.num_train_step = train_step
+        self.num_test_step = test_step
+        self.loss_tracker = keras.metrics.MeanSquaredError(name='mse')
+        self.lm_metric = lm_metric
 
-def NME(y_true, y_pred):
-    return tf.reduce_mean(tf.keras.losses.MSE(y_true, y_pred))
+    def train_step(self, data):
+        self.lm_metric.reset_states()
+        x, y = data
+        with tf.GradientTape() as tape:
+            y_pred = self(x, training=True) # Forward pass
+            # Compute out own loss
+            loss = self.compiled_loss(y, y_pred)
 
-def lr_scheduler(epoch, lr):
-    if epoch == 20:
-        return 1e-04
-    if epoch == 35:
-        return 1e-05
-    if epoch == 50:
-        return 1e-06
-    return lr
+        # Compute gradients
+        trainable_vars = self.trainable_variables
+        gradients = tape.gradient(loss, trainable_vars)
 
-# def FacialLandmarkDetector(num_modules=4):
-#     layers_dict = dict()
+        # Update weights
+        self.optimizer.apply_gradients(zip(gradients, trainable_vars))
+
+        # Update metrics
+        self.loss_tracker.update_state(y, y_pred)
+        self.lm_metric.update_state(y, y_pred)
+        return {'mse': self.loss_tracker.result(), 'lm_loss': self.lm_metric.result()}
     
-#     inputs = Input(shape=(256, 256, 3), batch_size=16, sparse=False, ragged=False)
-    
-#     # base part
-#     conv1 = layers.Conv2D(64, (7, 7), padding='same', strides=2)
-#     bn1 = layers.BatchNormalization()
-    
-#     conv2 = ConvBlock(64, 128)
-#     conv3 = ConvBlock(128, 128)
-#     conv4 = ConvBlock(128, 256)
-    
-#     # Stacking part
-#     for hg_module in range(num_modules):
-#         layers_dict['m' + str(hg_module)] = HourGlass(1, 4, 256)
-#         layers_dict['top_m_' + str(hg_module)] = ConvBlock(256, 256)
-#         layers_dict['conv_last' + str(hg_module)] = layers.Conv2D(256, (1, 1), padding='valid', strides=1)
-#         layers_dict['bn_end' + str(hg_module)] = layers.BatchNormalization()
-#         layers_dict['l' + str(hg_module)] = layers.Conv2D(68, (1, 1), padding='valid', strides=1) # 16 heatmaps
-        
-#         if hg_module < num_modules - 1:
-#             layers_dict['bl' + str(hg_module)] = layers.Conv2D(256, (1, 1), padding='valid', strides=1)
-#             layers_dict['al' + str(hg_module)] = layers.Conv2D(256, (1, 1), padding='valid', strides=1)
+    def test_step(self, data):
+        self.lm_metric.reset_states()
+        x, y = data
+        y_pred = self(x, training=False) # Forward pass
 
-#     # Call
-#     x = tf.nn.relu(bn1(conv1(inputs)))
-#     x = conv2(x)
-#     x = layers.AveragePooling2D((2, 2), strides=2)(x)
-#     x = conv3(x)
-#     x = conv4(x)
-    
-#     previous = x
-#     outputs = []
-    
-#     for i in range(num_modules):
-#         hg = layers_dict['m' + str(i)](previous)
-        
-#         ll = hg
-#         ll = layers_dict['top_m_' + str(i)](ll)
-        
-#         ll = tf.nn.relu(layers_dict['bn_end' + str(i)]
-#                         (layers_dict['conv_last' + str(i)](ll)))
-        
-#         # Predict heatmaps
-#         tmp_out = layers_dict['l' + str(i)](ll)
-#         outputs.append(tmp_out)
-        
-#         if i < num_modules - 1:
-#             ll = layers_dict['bl' + str(i)](ll)
-#             tmp_out_ = layers_dict['al' + str(i)](tmp_out)
-#             previous = previous + ll + tmp_out_
-    
-#     initial_learning_rate = 1e-03
-#     decay_steps = 20.0
-#     decay_rate = 0.1
-#     learning_rate_fn = tf.keras.optimizers.schedules.InverseTimeDecay(
-#         initial_learning_rate, decay_steps, decay_rate)
-#     # opt = tf.keras.optimizers.Adam(learning_rate_fn)
-#     opt = tf.keras.optimizers.RMSprop(learning_rate_fn)
-#     # opt = tf.keras.optimizers.RMSprop(
-#     #     learning_rate=1e-04, rho=0.9, momentum=0.0, epsilon=1e-07, centered=False,
-#     #     name='RMSprop')
-#     model = models.Model(inputs=inputs, outputs=outputs[-1], name='FacialLandmarkDetector')
-#     model.compile(optimizer=opt, loss='mse')
-#     model.build((None, 256, 256, 3))
-#     # model.summary()
+        self.loss_tracker.update_state(y, y_pred)
+        self.lm_metric.update_state(y, y_pred)
+        return {'mse': self.loss_tracker.result(), 'lm_loss': self.lm_metric.result()}
 
-#     return model
 
-class FacialLandmarkDetector(model):
-    def __init__(self, num_modules=4, num_parts=68):
-        super(FacialLandmarkDetector, self).__init__()
-
-        self.num_modules = num_modules
-        # base part
-        self.layers_dict = dict()
-        self.conv1 = layers.Conv2D(64, (7, 7), padding='same', strides=2)
-        self.bn1 = layers.BatchNormalization()
         
-        self.conv2 = ConvBlock(64, 128)
-        self.conv3 = ConvBlock(128, 128)
-        self.conv4 = ConvBlock(128, 256)
+
         
-        self.avg = layers.AveragePooling2D((2, 2), strides=2)
-
-        # Stacking part
-        for hg_module in range(self.num_modules):
-            self.layers_dict['m' + str(hg_module)] = HourGlass(1, 4, 256)
-            self.layers_dict['top_m_' + str(hg_module)] = ConvBlock(256, 256)
-            self.layers_dict['conv_last' + str(hg_module)] = layers.Conv2D(256, (1, 1), padding='valid', strides=1)
-            self.layers_dict['bn_end' + str(hg_module)] = layers.BatchNormalization()
-            self.layers_dict['l' + str(hg_module)] = layers.Conv2D(num_parts, (1, 1), padding='valid', strides=1)
-            
-            if hg_module < self.num_modules - 1:
-                self.layers_dict['bl' + str(hg_module)] = layers.Conv2D(256, (1, 1), padding='valid', strides=1)
-                self.layers_dict['al' + str(hg_module)] = layers.Conv2D(256, (1, 1), padding='valid', strides=1)
-
-    # def compile(self, optimizer, loss_fn, accuracy):
-    #     super(FacialLandmarkDetector, self).compile()
-    #     self.optimizer = optimizer
-    #     self.loss_fn = loss_fn
-    #     self.accuracy = accuracy
-
-    def call(self, inputs):
-        x = tf.nn.relu(self.bn1(self.conv1(inputs)))
-        x = self.conv2(x)
-        x = self.avg(x)
-        x = self.conv3(x)
-        x = self.conv4(x)
-        
-        previous = x
-        outputs = []
-        
-        for i in range(self.num_modules):
-            hg = self.layers_dict['m' + str(i)](previous)
-            
-            ll = hg
-            ll = self.layers_dict['top_m_' + str(i)](ll)
-            
-            ll = tf.nn.relu(self.layers_dict['bn_end' + str(i)]
-                            (self.layers_dict['conv_last' + str(i)](ll)))
-            
-            # Predict heatmaps
-            tmp_out = self.layers_dict['l' + str(i)](ll)
-            outputs.append(tmp_out)
-            
-            if i < self.num_modules - 1:
-                ll = self.layers_dict['bl' + str(i)](ll)
-                tmp_out_ = self.layers_dict['al' + str(i)](tmp_out)
-                previous = previous + ll + tmp_out_
-
-        return outputs[-1]

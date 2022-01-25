@@ -18,7 +18,7 @@ from libs import eval
 from libs.eval import plot_to_image
 from libs.utils import NME, lr_scheduler, HeatmapLoss, my_loss
 
-from tasks.model_legacy import FAN
+from legacy.model_legacy import FAN
 
 np.set_printoptions(precision=6, suppress=True)
 

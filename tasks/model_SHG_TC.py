@@ -1,15 +1,7 @@
-import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import datasets, layers, models
-from tensorflow.keras import Model as model
-
-import matplotlib.pyplot as plt
-import matplotlib
-matplotlib.rcParams.update({'font.size': 5})
-from libs.utils import plot_to_image
-
-from libs import eval
+from tensorflow.keras import layers
+from tensorflow.keras import Model
 
 class Residual(layers.Layer):
     def __init__(self, in_ch, out_ch):
@@ -67,7 +59,7 @@ class Hourglass(layers.Layer):
         else:
             self.low2 = Residual(nf, nf)
         self.low3 = Residual(nf, f)
-        self.up2 = layers.UpSampling2D((2, 2), interpolation='nearest')
+        self.up2 = layers.Conv2DTranspose(256, (2, 2), strides=2, padding='valid')
 
     def call(self, x):
         up1  = self.up1(x)
@@ -79,9 +71,9 @@ class Hourglass(layers.Layer):
 
         return up1 + up2
 
-class FAN(model):
+class StackedHourglassNetworks(Model):
     def __init__(self, nstack, in_ch, out_ch, bn=False, increase=0):
-        super(FAN, self).__init__()
+        super(StackedHourglassNetworks, self).__init__()
 
         self.nstack = nstack
         self.pre = [
@@ -131,8 +123,8 @@ class FAN(model):
         return combined_hm_preds[-1]
 
 
-class FacialLandmarkDetector(keras.Model):
-    def __init__(self, lm_metric, hm_size, batch_size, train_step, test_step, summary_writer=None, **kwargs):
+class FacialLandmarkDetector(Model):
+    def __init__(self, lm_metric, hm_size, batch_size, train_step, test_step, **kwargs):
         super(FacialLandmarkDetector, self).__init__(**kwargs)
         self.hm_size = hm_size
         self.batch_size = batch_size
@@ -140,7 +132,6 @@ class FacialLandmarkDetector(keras.Model):
         self.num_test_step = test_step
         self.loss_tracker = keras.metrics.MeanSquaredError(name='mse')
         self.lm_metric = lm_metric
-        self.summary_writer = summary_writer
 
     def train_step(self, data):
         self.lm_metric.reset_states()
@@ -167,30 +158,6 @@ class FacialLandmarkDetector(keras.Model):
         x, y = data
         y_pred = self(x, training=False) # Forward pass
 
-        # for idx, pred in enumerate(preds_arr):
-        #     example_img = np.reshape(img[idx], (-1, 256, 256, 3))
-        #     tf.summary.image('image_' + str(idx), example_img, step=self.epoch_step)
-        #     swap_pred = np.swapaxes(np.array([pred]), 0, 3)
-        #     figure = plt.figure(figsize=(7, 10))
-
-        #     for hm_idx, hm in enumerate(swap_pred):
-        #         plt.subplot(10, 7, hm_idx + 1, title=str(hm_idx))
-        #         plt.xticks([])
-        #         plt.yticks([])
-        #         plt.grid(False)
-        #         plt.imshow(hm, cmap=plt.cm.plasma)
-        #     plt.subplot(10, 7, 69, title='sum')
-        #     plt.xticks([])
-        #     plt.yticks([])
-        #     plt.grid(False)
-        #     plt.imshow(swap_pred.sum(axis=0), cmap=plt.cm.plasma)
-        #     tf.summary.image('predictions_' + str(idx), plot_to_image(figure), step=epoch)
-        # Update metrics
         self.loss_tracker.update_state(y, y_pred)
         self.lm_metric.update_state(y, y_pred)
         return {'mse': self.loss_tracker.result(), 'lm_loss': self.lm_metric.result()}
-
-
-        
-
-        

@@ -103,12 +103,6 @@ def lr_scheduler(epoch, lr):
         return 1e-06
     return lr
 
-# Loss function
-def HeatmapLoss(y_true, y_pred):
-    l = ((y_pred - y_true)**2)
-    l = tf.reduce_mean(tf.reduce_mean(tf.reduce_mean(l, 3), 2), 1)
-    return l ## l of dim bsize
-
 def get_transform(center, scale, res, rot=0):
     # Generate transformation matrix
     h = 200 * scale
