@@ -49,9 +49,10 @@ initial_learning_rate = 1e-04
 # decay_rate = 5.
 
 # Set Dataset
-DATASET_DIR       = '../Datasets/300W_train/train.csv'
-BASE_DIR          = '/media/cvmi-koo/HDD/Facial-Landmark-Detector/'
-CP_DIR            = os.path.join(BASE_DIR, 'data','checkpoint')
+DATASET_DIR = '../Datasets/300W_train/train.csv'
+BASE_DIR    = '/media/cvmi-koo/HDD/Facial-Landmark-Detector/'
+CP_DIR      = os.path.join(BASE_DIR, 'data','checkpoint')
+
 dataset           = Dataset(IMG_RES, HM_SIZE, NUM_LANDMARKS, DATASET_DIR)
 dataset_generator = dataset.tf_dataset_from_generator(BATCH_SIZE)
 eval_dataset      = Dataset(IMG_RES, HM_SIZE, NUM_LANDMARKS, '../Datasets/300W/eval.csv')
@@ -60,7 +61,7 @@ eval_generator    = eval_dataset.tf_dataset_from_generator(BATCH_SIZE)
 # Hyper Parameter
 # learning_rate_fn = tf.keras.optimizers.schedules.InverseTimeDecay(initial_learning_rate, decay_steps, decay_rate)
 optimizer = tf.keras.optimizers.Adam(learning_rate=initial_learning_rate)
-loss_fn   = NME
+loss_fn = NME
 # checkpoint callback
 cp_callback = tf.keras.callbacks.ModelCheckpoint(os.path.join(CP_DIR, os.path.join(MODEL_NAME, 'cp_{epoch}.ckpt')), monitor='val_loss', verbose=0, save_best_only=False, save_weights_only=False, mode='auto', save_freq='epoch', options=None)
 
@@ -68,7 +69,7 @@ cp_callback = tf.keras.callbacks.ModelCheckpoint(os.path.join(CP_DIR, os.path.jo
 lm_metric = LandmarkLoss(IMG_RES, HM_SIZE)
 
 # Set Tensorboard directory
-current_time   = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 TB_DIR = os.path.join(BASE_DIR, 'data', 'tensorboard', MODEL_NAME + '_' + current_time)
 
 # Load a Model

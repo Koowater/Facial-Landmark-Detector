@@ -1,8 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
-import tensorflow as tf
+from parso import parse
+import tensorflow as tf 
 import io
+
+from tasks.model_SHG import StackedHourglassNetworks
 
 def l2_distance(a, b):
     d = a - b
@@ -38,10 +41,32 @@ def plot_to_image(figure):
     # the notebook.
     plt.close(figure)
     buf.seek(0)
-    # Convert PNG buffer to TF image
-    image = tf.image.decode_png(buf.getvalue(), channels=4)
-    # Add the batch dimension
-    image = tf.expand_dims(image, 0)
+    # Convert PNG buffer to input image, 0)
     return image
 
+class Inferencer():
+    def __init__(self, path):
+        # self.model = StackedHourglassNetworks(4, 256, 68)
+        # self.model.load_weights(path)
+        self.model = tf.saved_model.load(path)
 
+    def __call__(self, input):
+        # if input.ndim == 3:
+        if type(input) is str:
+            heatmaps = self.from_image_path(input)
+        else:
+            heatmaps = self.from_ndarray(input)
+        landmarks = parse_heatmap(heatmaps)
+        return landmarks
+
+    def from_ndarray(self, ndarray):
+        # input size  : (None, 256, 256, 3)
+        # input dtype : np.float32
+        return self.model(ndarray)
+
+    def from_image_path(self, path):
+        load_image = cv2.imread(path)
+        resized_image = cv2.resize(load_image, dsize=(256, 256), interpolation=cv2.INTER_AREA)
+        return self.model(np.array([resized_image]).astype(np.float32) / 255.)
+
+            

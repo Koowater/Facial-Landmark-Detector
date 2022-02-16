@@ -4,6 +4,6 @@
 
     tensorflow >= 2.6.0
 
-## 2. How to inference
-
-## 3. How to train using custom datasets
+## 2. To be implemented
+    
+    - Face detector
