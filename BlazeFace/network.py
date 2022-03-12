@@ -1,5 +1,7 @@
 import tensorflow as tf
-from tensorflow.keras.layers import DepthwiseConv2D, Conv2D, MaxPooling2D, ReLU, Input, BatchNormalization, Reshape, Concatenate
+from tensorflow.keras import Input
+from tensorflow.keras.layers import DepthwiseConv2D, Conv2D, MaxPooling2D, ReLU, BatchNormalization, Reshape, Concatenate
+from tensorflow.python.keras.activations import relu
 
 class BlazeBlock(tf.keras.Model):
     def __init__(self, channel, stride=1, name='BlazeBlock'):
@@ -84,6 +86,10 @@ def FeatureExtractor():
     model = tf.keras.Model(inputs=inputs, outputs=[DBB_2, DBB_5], name='FeatureExtractor')
     
     return model
+
+if __name__ == '__main__':
+    model = FeatureExtractor()
+    model.summary()
 
 
 
