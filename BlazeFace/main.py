@@ -10,8 +10,8 @@ from tensorflow.keras.activations import relu
 class BlazeFace():
     def __init__(self, config):
         self.input_shape = config.input_shape
-        self.feature_extractor = FeatureExtractor(self.inpu_shape)
-        self.n_boxes [2, 6]
+        self.feature_extractor = FeatureExtractor()
+        self.n_boxes = [2, 6]
         self.model = self.build_model()
 
         if config.train:
@@ -31,29 +31,29 @@ class BlazeFace():
                                             activation='sigmoid')(model.output[0])
         bb_16_conf_reshaped = Reshape((16**2 * self.n_boxes[0], 1))(bb_16_conf)
 
-        bb_8_conf = Conv2D(filters=self.n_boxes[0] * 1,
+        bb_8_conf = Conv2D(filters=self.n_boxes[1] * 1,
                            kernel_size=3,
                            padding='same', 
                            activation='sigmoid')(model.output[1])
 
-        bb_8_conf_reshaped = Reshape((8**2 * self.n_boxes[0], 1))(bb_8_conf)
+        bb_8_conf_reshaped = Reshape((8**2 * self.n_boxes[1], 1))(bb_8_conf)
 
         conf_of_bb = Concatenate(axis=1)([bb_16_conf_reshaped, bb_8_conf_reshaped])
 
         # bounding box location prediction
-        bb_16_loc = Conv2D()(filters=self.n_boxes[0] * 4,
+        bb_16_loc = Conv2D(filters=self.n_boxes[0] * 4,
                              kernel_size=3,
                              padding='same')(model.output[0])
         
-        bb_16_loc_reshape = Reshape((16**2 * self.n_boxes[1], 4))(bb_16_loc)
+        bb_16_loc_reshaped = Reshape((16**2 * self.n_boxes[0], 4))(bb_16_loc)
 
         bb_8_loc = Conv2D(filters=self.n_boxes[1] * 4,
                           kernel_size=3,
-                          padding='same')(bb_8_loc)
+                          padding='same')(model.output[1])
 
-        bb_8_loc_reshape = Reshape((8**2 * self.n_boxes[1], 4))(bb_8_loc)
+        bb_8_loc_reshaped = Reshape((8**2 * self.n_boxes[1], 4))(bb_8_loc)
 
-        loc_of_bb = Concatenate(axis=1)([bb_16_loc_reshape[1], bb_8_loc_reshape])
+        loc_of_bb = Concatenate(axis=1)([bb_16_loc_reshaped, bb_8_loc_reshaped])
 
         output_combined = Concatenate(axis=-1)([conf_of_bb, loc_of_bb])
 
@@ -98,8 +98,8 @@ if __name__ == "__main__":
     # hyperparameters
     args.add_argument('--input_shape', type=int, default=[128, 128, 3])
     args.add_argument('--batch_size', type=int, default=128)
-    args.add_argument('--nb_epoch', type=int, default=1000)
-    args.add_argument('--numdata', type=int, default=2625)
+    args.add_argument('--epochs', type=int, default=1000)
+    args.add_argument('--total_data', type=int, default=2625)
     args.add_argument('--train', type=bool, default=True)
     args.add_argument('--checkpoint_path', type=str, default="./")
     args.add_argument('--dataset_dir', type=str, default="./")
@@ -109,5 +109,5 @@ if __name__ == "__main__":
 
     blazeface = BlazeFace(config)
 
-    if config.train:
-        blazeface.train()
+    model = blazeface.build_model()
+    model.summary()
