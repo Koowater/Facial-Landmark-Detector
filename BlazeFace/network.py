@@ -70,7 +70,8 @@ class DoubleBlazeBlock(tf.keras.Model):
 def FeatureExtractor():
     inputs = Input(shape=(128, 128, 3), name='Input')
     conv = Conv2D(filters=24, kernel_size=(5, 5), strides=(2, 2), padding='same', name='Conv')(inputs)
-    x = ReLU(name='ReLU')(conv)
+    bn = BatchNormalization()(conv)
+    x = ReLU(name='ReLU')(bn)
     SBB_0 = BlazeBlock(24,    name='BlazeBlock_0')(x)
     SBB_1 = BlazeBlock(24,    name='BlazeBlock_1')(SBB_0)
     SBB_2 = BlazeBlock(48, 2, name='BlazeBlock_2')(SBB_1)
