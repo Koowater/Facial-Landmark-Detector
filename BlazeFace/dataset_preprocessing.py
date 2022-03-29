@@ -1,8 +1,13 @@
+# For training BlazeFace, input image and label(box's x, y, width, height, image's width and height information for box mapping) are required.
+
 import os
+import glob
+import pickle
 from tqdm import tqdm
 import pandas as pd
+import cv2 
 
-dataset_dir = os.path.join('..', '..', '..', 'Dataset', 'WIDER_FACE')
+dataset_dir = os.path.join('..', '..', 'Dataset', 'WIDER_FACE')
 if not os.path.isdir(dataset_dir):
     raise Exception("Dataset directory is not exist. Check dataset's path.")
 
@@ -17,6 +22,9 @@ if not os.path.isfile(train_label_path):
 gts = (('train', train_label_path), ('val', val_label_path))
 
 columns = ('image_path', 'x', 'y', 'w', 'h', 'blur', 'expression', 'illumination', 'invalid', 'occlusion', 'pose')
+
+
+# For label.csv
 
 for label_type, label_path in gts:
     print(f"\n{label_type.upper()} txt file is converting to csv...")
@@ -45,6 +53,33 @@ for label_type, label_path in gts:
 
         df = pd.DataFrame(labels, columns=columns)
         df.to_csv(os.path.join(dataset_dir, f"{label_type}.csv"), index=False)
+
+print('')
+
+# For label.pickle
+
+def get_size_and_path(path):
+    img = cv2.imread(path)
+    img_splited = path.split(os.sep)[-2:]
+    img_path = os.path.join(img_splited[0], img_splited[1])
+    return img_path, (img.shape[1], img.shape[0]) # width, height
+
+for t in ('train', 'val'):
+    label_dict = {}
+    df = pd.read_csv(os.path.join(dataset_dir, f"{t}.csv"))
+    img_list = glob.glob(os.path.join(dataset_dir, f"WIDER_{t}", "images", "*/*.*"))
+    print(f"{t} images\n{len(img_list)} images are exist. Data mapping... Please wait.")
+    img_info = tuple(map(get_size_and_path, img_list))
+    print(f'{t.capitalize()} dataset dictionary is generated from images and csv file.')
+    for i in tqdm(img_info):
+        img_path, img_size = i[0], i[1]
+        label_dict[img_path] = {}
+        label_dict[img_path]['size'] = img_size
+        bbox_array = df.loc[df['image_path'] == img_path, ['x', 'y', 'w', 'h']].to_numpy()
+        label_dict[img_path]['bbox'] = bbox_array
+    
+    with open(f"BlazeFace/label_{t}.pickle", "wb") as fw:
+        pickle.dump(label_dict, fw)
 
 
 # This code is too slow!!!
