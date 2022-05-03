@@ -1,4 +1,5 @@
 import os
+import cv2
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from libs.eval import Inferencer
@@ -20,7 +21,6 @@ if gpus:
 model = Inferencer('data/checkpoint/cp_77.ckpt')
 
 result = model('data/test/0.jpg')
-detector = cv2.dnn.readNetFromCaffe("data/test/deploy.prototxt" , "data/test/res10_300x300_ssd_iter_140000.caffemodel")
 
 image = cv2.imread('data/test/0.jpg')
 height, width, _ = image.shape
